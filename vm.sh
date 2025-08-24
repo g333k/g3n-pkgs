@@ -1,69 +1,53 @@
 #!/bin/bash
+# Script para habilitar pantalla completa dinámica en VMware con Arch Linux
+# Autor: ChatGPT adaptado para Arch Linux
 
-# ================================
-#   Arch Linux VMware Tools Setup
-# ================================
-
-# 🎨 Colores
 GREEN="\e[32m"
 YELLOW="\e[33m"
 RED="\e[31m"
 CYAN="\e[36m"
-LBLUE="\e[94m"
-RESET="\e[0m"
+RESET="\e[00m"
 
-# 🎨 Banner
-ART="
-=============================================
- Arch Linux - VMware Tools (open-vm-tools)
-=============================================
- By: @GeK
-"
-printf "${CYAN}${ART}${RESET}\n"
+clear
+echo -e "${CYAN}"
+echo "============================================="
+echo " VMware Tools Setup para Arch Linux "
+echo "============================================="
+echo -e "${RESET}"
 
-# Función: instalar open-vm-tools
-install_vmtools() {
-    printf "${YELLOW}[!]${RESET} Instalando 'open-vm-tools'...\n"
-    sudo pacman -Syu --noconfirm open-vm-tools xf86-input-vmmouse xf86-video-vmware mesa
-    printf "${GREEN}[+]${RESET} Paquete 'open-vm-tools' instalado correctamente\n\n"
-}
+echo -e "${YELLOW}[+] Instalando paquetes necesarios...${RESET}"
+sudo pacman -Syu --noconfirm open-vm-tools xf86-video-vmware xf86-input-vmmouse mesa
 
-# Función: habilitar servicios
-enable_services() {
-    printf "${LBLUE}[*]${RESET} Habilitando servicios de VMware Tools...\n"
-    sleep 1
+echo -e "\n${YELLOW}[+] Habilitando y arrancando servicios...${RESET}"
+sudo systemctl enable --now vmtoolsd.service
+sudo systemctl enable --now vmware-vmblock-fuse.service
 
-    sudo systemctl enable --now vmtoolsd.service
-    sudo systemctl enable --now vmware-vmblock-fuse.service
+echo -e "\n${YELLOW}[+] Configurando autoejecución de vmware-user...${RESET}"
 
-    printf "${GREEN}[+]${RESET} Servicios activados:\n"
-    printf "   - vmtoolsd.service\n"
-    printf "   - vmware-vmblock-fuse.service\n\n"
-}
-
-# Función: verificar instalación
-check_vmtools() {
-    if ! command -v vmware-user-suid-wrapper &>/dev/null; then
-        printf "${RED}[-]${RESET} 'open-vm-tools' no está instalado\n"
-        printf "${YELLOW}[?]${RESET} ¿Deseas instalarlo ahora? [Y/n]: "
-        read -r USER_INPUT
-        if [[ -z "$USER_INPUT" || "$USER_INPUT" =~ ^[Yy]$ ]]; then
-            install_vmtools
-            enable_services
-        else
-            printf "${RED}[-]${RESET} Cancelado por el usuario.\n"
-            exit 1
-        fi
+# Detectar escritorio
+if [[ "$XDG_CURRENT_DESKTOP" == *"GNOME"* || "$XDG_CURRENT_DESKTOP" == *"KDE"* || "$XDG_CURRENT_DESKTOP" == *"XFCE"* ]]; then
+    mkdir -p ~/.config/autostart
+    cat > ~/.config/autostart/vmware-user.desktop <<EOF
+[Desktop Entry]
+Type=Application
+Exec=vmware-user
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name=VMware User
+EOF
+    echo -e "${GREEN}[+] Se agregó vmware-user al autostart de tu escritorio gráfico${RESET}"
+elif [[ "$XDG_CURRENT_DESKTOP" == *"i3"* ]]; then
+    mkdir -p ~/.config/i3
+    if ! grep -q "vmware-user" ~/.config/i3/config 2>/dev/null; then
+        echo 'exec --no-startup-id vmware-user' >> ~/.config/i3/config
+        echo -e "${GREEN}[+] vmware-user agregado al config de i3${RESET}"
     else
-        printf "${GREEN}[+]${RESET} 'open-vm-tools' ya está instalado ✅\n\n"
-        enable_services
+        echo -e "${YELLOW}[!] vmware-user ya estaba en tu config de i3${RESET}"
     fi
-}
+else
+    echo -e "${RED}[-] No se detectó escritorio soportado automáticamente.${RESET}"
+    echo -e "${YELLOW}[!] Agrega 'vmware-user' al autostart manualmente.${RESET}"
+fi
 
-# ================================
-#   MAIN
-# ================================
-check_vmtools
-
-printf "${GREEN}[✓]${RESET} Configuración completada.\n"
-printf "${LBLUE}[*]${RESET} Ahora reinicia tu VM para aplicar los cambios.\n"
+echo -e "\n${GREEN}[✔] Listo! Reinicia la máquina virtual y prueba pantalla completa dinámica.${RESET}"
